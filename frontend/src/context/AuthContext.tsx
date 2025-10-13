@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useReducer, ReactNode } from 'react'
+import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react'
+import { authAPI, setAuthToken, removeAuthToken, getStoredUser, setStoredUser } from '../services/api'
 import type { AuthUser, LoginCredentials, RegisterData } from '../state/types'
 
 interface AuthState {
@@ -70,7 +71,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
 const initialState: AuthState = {
   user: null,
   isAuthenticated: false,
-  isLoading: false, // Start as not loading
+  isLoading: true,
   error: null
 }
 
@@ -81,24 +82,43 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState)
 
-  // No useEffect - no API calls on mount
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        const token = localStorage.getItem('token')
+        const storedUser = getStoredUser()
+
+        if (token && storedUser) {
+          setAuthToken(token)
+          try {
+            const user = await authAPI.getProfile()
+            dispatch({ type: 'AUTH_SUCCESS', payload: user })
+            setStoredUser(user)
+          } catch (error) {
+            removeAuthToken()
+            dispatch({ type: 'AUTH_FAILURE', payload: '' })
+          }
+        } else {
+          dispatch({ type: 'AUTH_FAILURE', payload: '' })
+        }
+      } catch (error) {
+        dispatch({ type: 'AUTH_FAILURE', payload: '' })
+      }
+    }
+
+    initAuth()
+  }, [])
 
   const login = async (credentials: LoginCredentials) => {
     try {
       dispatch({ type: 'AUTH_START' })
-      // Mock login for now
-      const mockUser: AuthUser = {
-        id: '1',
-        username: credentials.email.split('@')[0],
-        email: credentials.email,
-        firstName: 'Test',
-        lastName: 'User',
-        rating: 5,
-        isVerified: true
-      }
-      dispatch({ type: 'AUTH_SUCCESS', payload: mockUser })
+      const { token, user } = await authAPI.login(credentials)
+      setAuthToken(token)
+      setStoredUser(user)
+      dispatch({ type: 'AUTH_SUCCESS', payload: user })
     } catch (error: any) {
-      dispatch({ type: 'AUTH_FAILURE', payload: 'Login failed' })
+      const errorMessage = error.response?.data?.error || 'Login failed'
+      dispatch({ type: 'AUTH_FAILURE', payload: errorMessage })
       throw error
     }
   }
@@ -106,24 +126,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const register = async (userData: RegisterData) => {
     try {
       dispatch({ type: 'AUTH_START' })
-      // Mock register for now
-      const mockUser: AuthUser = {
-        id: '1',
-        username: userData.username,
-        email: userData.email,
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        rating: 5,
-        isVerified: false
-      }
-      dispatch({ type: 'AUTH_SUCCESS', payload: mockUser })
+      const { token, user } = await authAPI.register(userData)
+      setAuthToken(token)
+      setStoredUser(user)
+      dispatch({ type: 'AUTH_SUCCESS', payload: user })
     } catch (error: any) {
-      dispatch({ type: 'AUTH_FAILURE', payload: 'Registration failed' })
+      const errorMessage = error.response?.data?.error || 'Registration failed'
+      dispatch({ type: 'AUTH_FAILURE', payload: errorMessage })
       throw error
     }
   }
 
   const logout = () => {
+    removeAuthToken()
     dispatch({ type: 'LOGOUT' })
   }
 
@@ -133,14 +148,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const updateUser = async (userData: Partial<AuthUser>) => {
     try {
-      dispatch({ type: 'AUTH_START' })
-      // Mock update for now
-      if (state.user) {
-        const updatedUser = { ...state.user, ...userData }
-        dispatch({ type: 'AUTH_SUCCESS', payload: updatedUser })
-      }
+      const updatedUser = await authAPI.updateProfile(userData)
+      setStoredUser(updatedUser)
+      dispatch({ type: 'AUTH_SUCCESS', payload: updatedUser })
     } catch (error: any) {
-      dispatch({ type: 'AUTH_FAILURE', payload: 'Update failed' })
+      const errorMessage = error.response?.data?.error || 'Update failed'
+      dispatch({ type: 'AUTH_FAILURE', payload: errorMessage })
       throw error
     }
   }
