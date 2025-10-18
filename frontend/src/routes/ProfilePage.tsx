@@ -23,14 +23,14 @@ export const ProfilePage: React.FC = () => {
           <Link to="/create" className="text-sm text-slate-300 underline">New</Link>
         </div>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {myAuctions.map((a)=> <AuctionCard key={a.id} auction={a} />)}
+          {myAuctions.map((a)=> <AuctionCard key={a._id} auction={a} />)}
         </div>
       </section>
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Your bids</h2>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {myBids.map((a)=> <AuctionCard key={a.id} auction={a} />)}
+          {myBids.map((a)=> <AuctionCard key={a._id} auction={a} />)}
         </div>
       </section>
     </div>

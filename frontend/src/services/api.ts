@@ -1,4 +1,5 @@
-import axios, { AxiosResponse } from 'axios'
+import axios from 'axios'
+import type { AxiosResponse } from 'axios'
 import type { 
   AuctionItem, 
   User, 
@@ -7,7 +8,6 @@ import type {
   LoginCredentials, 
   RegisterData, 
   CreateAuctionData,
-  ApiResponse,
   PaginatedResponse
 } from '../state/types'
 

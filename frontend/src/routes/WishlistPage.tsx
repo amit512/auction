@@ -8,7 +8,7 @@ export const WishlistPage: React.FC = () => {
   const { wishlist } = useWishlist()
   
   // Get full auction objects for wishlisted items
-  const wishlistItems = mockAuctions.filter(auction => wishlist.includes(auction.id))
+  const wishlistItems = mockAuctions.filter(auction => wishlist.includes(auction._id))
 
   if (wishlist.length === 0) {
     return (
@@ -37,7 +37,7 @@ export const WishlistPage: React.FC = () => {
       
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {wishlistItems.map((auction) => (
-          <AuctionCard key={auction.id} auction={auction} />
+          <AuctionCard key={auction._id} auction={auction} />
         ))}
       </div>
     </div>

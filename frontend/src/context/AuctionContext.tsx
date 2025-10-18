@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useReducer, ReactNode } from 'react'
-import type { AuctionItem, Bid, CreateAuctionData, PaginatedResponse } from '../state/types'
+import React, { createContext, useContext, useReducer } from 'react'
+import type { ReactNode } from 'react'
+import type { AuctionItem, Bid, CreateAuctionData } from '../state/types'
 
 interface AuctionState {
   auctions: AuctionItem[]
@@ -144,7 +145,7 @@ interface AuctionProviderProps {
 export const AuctionProvider: React.FC<AuctionProviderProps> = ({ children }) => {
   const [state, dispatch] = useReducer(auctionReducer, initialState)
 
-  const fetchAuctions = async (params?: any) => {
+  const fetchAuctions = async (_params?: any) => {
     try {
       dispatch({ type: 'FETCH_START' })
       // Mock data for now
@@ -175,7 +176,7 @@ export const AuctionProvider: React.FC<AuctionProviderProps> = ({ children }) =>
     }
   }
 
-  const fetchAuctionById = async (id: string) => {
+  const fetchAuctionById = async (_id: string) => {
     try {
       dispatch({ type: 'FETCH_START' })
       // Mock implementation
@@ -186,7 +187,7 @@ export const AuctionProvider: React.FC<AuctionProviderProps> = ({ children }) =>
     }
   }
 
-  const createAuction = async (auctionData: CreateAuctionData) => {
+  const createAuction = async (_auctionData: CreateAuctionData) => {
     try {
       dispatch({ type: 'FETCH_START' })
       // Mock implementation
@@ -197,7 +198,7 @@ export const AuctionProvider: React.FC<AuctionProviderProps> = ({ children }) =>
     }
   }
 
-  const updateAuction = async (id: string, auctionData: Partial<CreateAuctionData>) => {
+  const updateAuction = async (_id: string, _auctionData: Partial<CreateAuctionData>) => {
     try {
       dispatch({ type: 'FETCH_START' })
       // Mock implementation
@@ -208,7 +209,7 @@ export const AuctionProvider: React.FC<AuctionProviderProps> = ({ children }) =>
     }
   }
 
-  const deleteAuction = async (id: string) => {
+  const deleteAuction = async (_id: string) => {
     try {
       dispatch({ type: 'FETCH_START' })
       // Mock implementation
@@ -219,7 +220,7 @@ export const AuctionProvider: React.FC<AuctionProviderProps> = ({ children }) =>
     }
   }
 
-  const placeBid = async (auctionId: string, amount: number) => {
+  const placeBid = async (_auctionId: string, _amount: number) => {
     try {
       dispatch({ type: 'FETCH_START' })
       // Mock implementation

@@ -7,7 +7,7 @@ import { useAuction } from '../context/AuctionContext'
 import { useAuth } from '../context/AuthContext'
 
 export const HomePage: React.FC = () => {
-  const { fetchAuctions, isLoading } = useAuction()
+  const { fetchAuctions } = useAuction()
   const { isAuthenticated } = useAuth()
 
   useEffect(() => {

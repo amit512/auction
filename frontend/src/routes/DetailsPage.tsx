@@ -6,20 +6,20 @@ import { useBidHistory } from '../context/BidHistoryContext'
 
 export const DetailsPage: React.FC = () => {
   const { id } = useParams()
-  const item = useMemo(() => mockAuctions.find((a) => a.id === id), [id])
+  const item = useMemo(() => mockAuctions.find((a) => a._id === id), [id])
   const { addBid, getBidsForAuction } = useBidHistory()
   const [bidAmount, setBidAmount] = useState('')
   const [showBidHistory, setShowBidHistory] = useState(false)
   
   if (!item) return <div>Not found.</div>
 
-  const userBids = getBidsForAuction(item.id)
+  const userBids = getBidsForAuction(item._id)
   const minBid = item.currentBid + 10
 
   const handleBid = () => {
     const amount = parseInt(bidAmount)
     if (amount >= minBid) {
-      addBid(item.id, item.title, amount)
+      addBid(item._id, item.title, amount)
       setBidAmount('')
       // In a real app, this would update the auction's current bid
     }
@@ -88,7 +88,7 @@ export const DetailsPage: React.FC = () => {
           <div className="font-medium mb-1">Description</div>
           <p className="text-slate-300">{item.description}</p>
         </div>
-        <div className="text-sm text-slate-400">Seller: {item.seller} • Category: {item.category}</div>
+        <div className="text-sm text-slate-400">Seller: {typeof item.seller === 'string' ? item.seller : (item.seller.firstName ? `${item.seller.firstName} ${item.seller.lastName}` : item.seller.username)} • Category: {item.category}</div>
       </div>
     </div>
   )

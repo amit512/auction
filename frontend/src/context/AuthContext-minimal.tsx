@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useReducer, ReactNode } from 'react'
+import React, { createContext, useContext, useReducer } from 'react'
+import type { ReactNode } from 'react'
 import type { AuthUser, LoginCredentials, RegisterData } from '../state/types'
 
 interface AuthState {
