@@ -86,6 +86,7 @@ export type CreateAuctionData = {
   images?: string[]
   startingPrice: number
   category: string
+  startsAt?: string
   endsAt: string
   condition?: 'new' | 'like-new' | 'good' | 'fair' | 'poor'
   location?: string
