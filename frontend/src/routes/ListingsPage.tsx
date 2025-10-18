@@ -1,10 +1,12 @@
 import React, { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { mockAuctions, mockCategories } from '../state/mockData'
+import { mockCategories } from '../state/mockData'
+import { useAuction } from '../context/AuctionContext'
 import { AuctionCard } from '../ui/AuctionCard'
 import { Filter, X } from 'lucide-react'
 
 export const ListingsPage: React.FC = () => {
+  const { auctions, fetchAuctions } = useAuction()
   const [params, setParams] = useSearchParams()
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState(params.get('category') || 'All')
@@ -14,8 +16,12 @@ export const ListingsPage: React.FC = () => {
   const [bidCount, setBidCount] = useState('')
   const [timeRemaining, setTimeRemaining] = useState('')
 
+  React.useEffect(() => {
+    fetchAuctions()
+  }, [])
+
   const filtered = useMemo(() => {
-    let list = mockAuctions
+    let list = auctions
     
     // Text search
     if (query) {
@@ -69,7 +75,7 @@ export const ListingsPage: React.FC = () => {
     }
     
     return list
-  }, [category, query, sort, priceRange, bidCount, timeRemaining])
+  }, [auctions, category, query, sort, priceRange, bidCount, timeRemaining])
 
   const clearFilters = () => {
     setQuery('')
@@ -219,7 +225,7 @@ export const ListingsPage: React.FC = () => {
       {/* Results */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {filtered.map((a) => (
-          <AuctionCard key={a.id} auction={a} />
+          <AuctionCard key={a._id} auction={a as any} />
         ))}
       </div>
 

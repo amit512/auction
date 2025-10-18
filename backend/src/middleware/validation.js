@@ -73,6 +73,21 @@ export const validateAuctionCreation = [
       }
       return true;
     }),
+  body('startsAt')
+    .optional()
+    .isISO8601()
+    .withMessage('Start date must be a valid date')
+    .custom((value, { req }) => {
+      const endsAt = new Date(req.body.endsAt);
+      const startsAt = new Date(value);
+      if (startsAt >= endsAt) {
+        throw new Error('Start date must be before end date');
+      }
+      if (startsAt <= new Date()) {
+        throw new Error('Start date must be in the future');
+      }
+      return true;
+    }),
   body('image')
     .isURL()
     .withMessage('Image must be a valid URL'),

@@ -1,27 +1,34 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { mockAuctions } from '../state/mockData'
 import { Countdown } from '../ui/Countdown'
 import { useBidHistory } from '../context/BidHistoryContext'
+import { useAuction } from '../context/AuctionContext'
 
 export const DetailsPage: React.FC = () => {
   const { id } = useParams()
-  const item = useMemo(() => mockAuctions.find((a) => a.id === id), [id])
+  const { currentAuction, fetchAuctionById, placeBid, connectToAuction, disconnectFromAuction } = useAuction()
   const { addBid, getBidsForAuction } = useBidHistory()
   const [bidAmount, setBidAmount] = useState('')
   const [showBidHistory, setShowBidHistory] = useState(false)
   
-  if (!item) return <div>Not found.</div>
+  useEffect(() => {
+    if (!id) return
+    fetchAuctionById(id)
+    connectToAuction(id)
+    return () => disconnectFromAuction(id)
+  }, [id])
 
-  const userBids = getBidsForAuction(item.id)
-  const minBid = item.currentBid + 10
+  if (!currentAuction) return <div>Loading...</div>
+
+  const userBids = getBidsForAuction(currentAuction._id)
+  const minBid = currentAuction.currentBid + 1
 
   const handleBid = () => {
     const amount = parseInt(bidAmount)
     if (amount >= minBid) {
-      addBid(item.id, item.title, amount)
+      addBid(currentAuction._id, currentAuction.title, amount)
+      placeBid(currentAuction._id, amount).catch(() => {})
       setBidAmount('')
-      // In a real app, this would update the auction's current bid
     }
   }
 
@@ -36,10 +43,16 @@ export const DetailsPage: React.FC = () => {
           <p className="text-slate-300 mt-1">{item.subtitle}</p>
         </div>
         <div className="flex items-center gap-4">
-          <div className="text-3xl font-semibold">${item.currentBid.toLocaleString()}</div>
+          <div className="text-3xl font-semibold">${currentAuction.currentBid.toLocaleString()}</div>
           <div className="text-slate-300">Current bid</div>
         </div>
-        <div className="text-slate-300">Ends in <span className="text-slate-100"><Countdown endsAt={item.endsAt} /></span></div>
+        <div className="text-slate-300">
+          {currentAuction.status === 'scheduled' ? (
+            <>Starts in <span className="text-slate-100"><Countdown endsAt={currentAuction.startsAt!} /></span></>
+          ) : (
+            <>Ends in <span className="text-slate-100"><Countdown endsAt={currentAuction.endsAt} /></span></>
+          )}
+        </div>
         <div className="space-y-2">
           <div className="font-medium">Place a bid</div>
           <div className="flex gap-2">
@@ -58,7 +71,7 @@ export const DetailsPage: React.FC = () => {
               Bid
             </button>
           </div>
-          <p className="text-xs text-slate-400">Bids are mock-only and will not be saved.</p>
+          <p className="text-xs text-slate-400">Live bids update in real-time.</p>
           
           {userBids.length > 0 && (
             <div className="mt-4">
@@ -86,9 +99,9 @@ export const DetailsPage: React.FC = () => {
         </div>
         <div>
           <div className="font-medium mb-1">Description</div>
-          <p className="text-slate-300">{item.description}</p>
+          <p className="text-slate-300">{currentAuction.description}</p>
         </div>
-        <div className="text-sm text-slate-400">Seller: {item.seller} • Category: {item.category}</div>
+        <div className="text-sm text-slate-400">Seller: {typeof currentAuction.seller === 'string' ? currentAuction.seller : currentAuction.seller.username} • Category: {currentAuction.category}</div>
       </div>
     </div>
   )

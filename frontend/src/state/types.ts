@@ -24,6 +24,7 @@ export type AuctionItem = {
   currentBid: number
   bids: number
   category: string
+  startsAt?: string
   endsAt: string
   seller: User | string
   status: 'active' | 'ended' | 'cancelled'

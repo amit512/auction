@@ -36,7 +36,7 @@ export const FeaturedGrid: React.FC = () => {
   return (
     <section className="space-y-4">
       <h2 className="text-xl font-semibold">Featured auctions</h2>
-      {auctions.length > 0 ? (
+      {auctions?.length > 0 ? (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {auctions.slice(0, 6).map((auction) => (
             <AuctionCard key={auction._id} auction={auction} />
@@ -50,5 +50,3 @@ export const FeaturedGrid: React.FC = () => {
     </section>
   )
 }
-
-
