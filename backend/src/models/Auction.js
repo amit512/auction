@@ -10,6 +10,7 @@ const auctionSchema = new mongoose.Schema({
   bids: { type: Number, default: 0 },
   category: { type: String, required: true },
   endsAt: { type: Date, required: true },
+  startsAt: { type: Date, default: () => new Date() },
   seller: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User', 
@@ -17,7 +18,7 @@ const auctionSchema = new mongoose.Schema({
   },
   status: { 
     type: String, 
-    enum: ['active', 'ended', 'cancelled'], 
+    enum: ['scheduled', 'active', 'ended', 'cancelled'], 
     default: 'active' 
   },
   winner: { 
@@ -38,6 +39,7 @@ const auctionSchema = new mongoose.Schema({
 // Index for better query performance
 auctionSchema.index({ category: 1, status: 1 });
 auctionSchema.index({ endsAt: 1 });
+auctionSchema.index({ startsAt: 1 });
 auctionSchema.index({ seller: 1 });
 
 export default mongoose.model("Auction", auctionSchema);

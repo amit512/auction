@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useReducer, ReactNode } from 'react'
+import React, { createContext, useContext, useEffect, useReducer, ReactNode } from 'react'
 import type { AuctionItem, Bid, CreateAuctionData, PaginatedResponse } from '../state/types'
+import { auctionAPI } from '../services/api'
+import { io as createSocket, Socket } from 'socket.io-client'
 
 interface AuctionState {
   auctions: AuctionItem[]
@@ -36,6 +38,8 @@ interface AuctionContextType extends AuctionState {
   placeBid: (auctionId: string, amount: number) => Promise<void>
   clearError: () => void
   clearCurrentAuction: () => void
+  connectToAuction: (auctionId: string) => void
+  disconnectFromAuction: (auctionId: string) => void
 }
 
 const AuctionContext = createContext<AuctionContextType | undefined>(undefined)
@@ -143,32 +147,21 @@ interface AuctionProviderProps {
 
 export const AuctionProvider: React.FC<AuctionProviderProps> = ({ children }) => {
   const [state, dispatch] = useReducer(auctionReducer, initialState)
+  const socketRef = React.useRef<Socket | null>(null)
+
+  useEffect(() => {
+    // Lazy connect when needed; keep single socket instance
+    return () => {
+      socketRef.current?.disconnect()
+      socketRef.current = null
+    }
+  }, [])
 
   const fetchAuctions = async (params?: any) => {
     try {
       dispatch({ type: 'FETCH_START' })
-      // Mock data for now
-      const mockAuctions: AuctionItem[] = [
-        {
-          _id: '1',
-          title: 'Test Auction 1',
-          subtitle: 'Test subtitle',
-          description: 'Test description',
-          image: 'https://images.unsplash.com/photo-1518779578993-ec3579fee39f?q=80&w=1000&auto=format&fit=crop',
-          startingPrice: 100,
-          currentBid: 150,
-          bids: 5,
-          category: 'Electronics',
-          endsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          seller: 'test-user',
-          status: 'active',
-          condition: 'good',
-          shippingCost: 10,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-      ]
-      dispatch({ type: 'FETCH_AUCTIONS_SUCCESS', payload: { auctions: mockAuctions, pagination: { currentPage: 1, totalPages: 1, totalItems: 1, itemsPerPage: 10 } } })
+      const { data, pagination } = await auctionAPI.getAuctions(params)
+      dispatch({ type: 'FETCH_AUCTIONS_SUCCESS', payload: { auctions: data, pagination } })
     } catch (error: any) {
       dispatch({ type: 'FETCH_FAILURE', payload: 'Failed to fetch auctions' })
       throw error
@@ -178,8 +171,8 @@ export const AuctionProvider: React.FC<AuctionProviderProps> = ({ children }) =>
   const fetchAuctionById = async (id: string) => {
     try {
       dispatch({ type: 'FETCH_START' })
-      // Mock implementation
-      dispatch({ type: 'FETCH_FAILURE', payload: 'Not implemented' })
+      const { auction, bids } = await auctionAPI.getAuctionById(id)
+      dispatch({ type: 'FETCH_AUCTION_SUCCESS', payload: { auction, bids } })
     } catch (error: any) {
       dispatch({ type: 'FETCH_FAILURE', payload: 'Failed to fetch auction' })
       throw error
@@ -189,8 +182,8 @@ export const AuctionProvider: React.FC<AuctionProviderProps> = ({ children }) =>
   const createAuction = async (auctionData: CreateAuctionData) => {
     try {
       dispatch({ type: 'FETCH_START' })
-      // Mock implementation
-      dispatch({ type: 'FETCH_FAILURE', payload: 'Not implemented' })
+      const item = await auctionAPI.createAuction(auctionData)
+      dispatch({ type: 'CREATE_AUCTION_SUCCESS', payload: item })
     } catch (error: any) {
       dispatch({ type: 'FETCH_FAILURE', payload: 'Failed to create auction' })
       throw error
@@ -222,12 +215,40 @@ export const AuctionProvider: React.FC<AuctionProviderProps> = ({ children }) =>
   const placeBid = async (auctionId: string, amount: number) => {
     try {
       dispatch({ type: 'FETCH_START' })
-      // Mock implementation
-      dispatch({ type: 'FETCH_FAILURE', payload: 'Not implemented' })
+      const result = await auctionAPI.placeBid(auctionId, amount)
+      dispatch({ type: 'PLACE_BID_SUCCESS', payload: result })
     } catch (error: any) {
       dispatch({ type: 'FETCH_FAILURE', payload: 'Failed to place bid' })
       throw error
     }
+  }
+
+  const ensureSocket = () => {
+    if (!socketRef.current) {
+      socketRef.current = createSocket('/', { withCredentials: true })
+      socketRef.current.on('connect_error', () => {})
+      socketRef.current.on('disconnect', () => {})
+      socketRef.current.on('auction:bid', (payload: { auctionId: string; currentBid: number; bids: number; bid: Bid }) => {
+        if (state.currentAuction?._id === payload.auctionId) {
+          dispatch({ type: 'PLACE_BID_SUCCESS', payload: { bid: payload.bid, auction: { currentBid: payload.currentBid, bids: payload.bids } } })
+        }
+      })
+      socketRef.current.on('auction:status', (payload: { auctionId: string; status: AuctionItem['status']; winner?: string | null; finalBid?: number }) => {
+        if (state.currentAuction?._id === payload.auctionId && state.currentAuction) {
+          dispatch({ type: 'UPDATE_AUCTION_SUCCESS', payload: { ...state.currentAuction, status: payload.status, currentBid: payload.finalBid ?? state.currentAuction.currentBid, winner: payload.winner ?? state.currentAuction.winner } as AuctionItem })
+        }
+      })
+    }
+    return socketRef.current!
+  }
+
+  const connectToAuction = (auctionId: string) => {
+    const s = ensureSocket()
+    s.emit('join-auction', auctionId)
+  }
+
+  const disconnectFromAuction = (auctionId: string) => {
+    socketRef.current?.emit('leave-auction', auctionId)
   }
 
   const clearError = () => {
@@ -247,7 +268,9 @@ export const AuctionProvider: React.FC<AuctionProviderProps> = ({ children }) =>
     deleteAuction,
     placeBid,
     clearError,
-    clearCurrentAuction
+    clearCurrentAuction,
+    connectToAuction,
+    disconnectFromAuction
   }
 
   return (
