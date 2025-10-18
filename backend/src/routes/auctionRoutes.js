@@ -1,6 +1,8 @@
 import express from "express";
 import Auction from "../models/Auction.js";
 import Bid from "../models/Bid.js";
+import mongoose from "mongoose";
+import { io } from "../index.js";
 import { authenticateToken, optionalAuth } from "../middleware/auth.js";
 import {
   validateAuctionCreation,
@@ -35,8 +37,9 @@ router.get("/", optionalAuth, validatePagination, async (req, res) => {
     }
 
     // Build sort object
-    const sort = {};
-    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+    const allowedSort = new Set(['endsAt', 'startsAt', 'currentBid', 'bids', 'createdAt']);
+    const sortField = allowedSort.has(String(sortBy)) ? String(sortBy) : 'endsAt';
+    const sort = { [sortField]: sortOrder === 'desc' ? -1 : 1 };
 
     const skip = (page - 1) * limit;
     
@@ -91,7 +94,8 @@ router.post("/", authenticateToken, validateAuctionCreation, async (req, res) =>
     const auctionData = {
       ...req.body,
       seller: req.user._id,
-      currentBid: req.body.startingPrice
+      currentBid: req.body.startingPrice,
+      status: req.body.startsAt && new Date(req.body.startsAt) > new Date() ? 'scheduled' : 'active'
     };
 
     const auction = new Auction(auctionData);
@@ -174,7 +178,6 @@ router.delete("/:id", authenticateToken, validateObjectId('id'), async (req, res
 router.post("/:id/bid", authenticateToken, validateObjectId('id'), validateBid, async (req, res) => {
   try {
     const auction = await Auction.findById(req.params.id);
-    
     if (!auction) {
       return res.status(404).json({ error: 'Auction not found' });
     }
@@ -196,56 +199,57 @@ router.post("/:id/bid", authenticateToken, validateObjectId('id'), validateBid, 
 
     const bidAmount = req.body.amount;
 
-    // Check if bid is higher than current bid
-    if (bidAmount <= auction.currentBid) {
-      return res.status(400).json({ error: 'Bid must be higher than current bid' });
-    }
-
-    // Check if bid meets minimum increment (e.g., $1)
-    const minIncrement = 1;
-    if (bidAmount < auction.currentBid + minIncrement) {
-      return res.status(400).json({ 
-        error: `Bid must be at least $${auction.currentBid + minIncrement}` 
-      });
-    }
-
-    // Create new bid
-    const bid = new Bid({
-      auction: req.params.id,
-      bidder: req.user._id,
-      amount: bidAmount
-    });
-
-    await bid.save();
-
-    // Update auction
-    auction.currentBid = bidAmount;
-    auction.bids += 1;
-    await auction.save();
-
-    // Mark previous winning bid as outbid
-    await Bid.updateMany(
-      { 
-        auction: req.params.id, 
-        bidder: { $ne: req.user._id },
-        isWinning: true 
+    // Atomic conditional update to prevent race conditions
+    const updatedAuction = await Auction.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        status: 'active',
+        endsAt: { $gt: new Date() },
+        currentBid: { $lt: bidAmount },
       },
-      { isOutbid: true, isWinning: false }
+      {
+        $set: { currentBid: bidAmount },
+        $inc: { bids: 1 },
+      },
+      { new: true }
     );
 
-    // Mark new bid as winning
-    bid.isWinning = true;
-    await bid.save();
+    if (!updatedAuction) {
+      return res.status(400).json({ error: 'Bid must exceed current bid and auction must be active' });
+    }
+
+    // Create bid linked to updated auction
+    const bid = await Bid.create({
+      auction: req.params.id,
+      bidder: req.user._id,
+      amount: bidAmount,
+      isWinning: true,
+      isOutbid: false,
+    });
+
+    // Mark previous winning bids as outbid (best-effort)
+    await Bid.updateMany(
+      { auction: req.params.id, _id: { $ne: bid._id }, isWinning: true },
+      { $set: { isWinning: false, isOutbid: true } }
+    );
 
     await bid.populate('bidder', 'username firstName lastName avatar');
+
+    // Emit live updates
+    io.to(`auction:${req.params.id}`).emit('auction:bid', {
+      auctionId: req.params.id,
+      currentBid: updatedAuction.currentBid,
+      bids: updatedAuction.bids,
+      bid,
+    });
 
     res.status(201).json({
       message: 'Bid placed successfully',
       bid,
       auction: {
-        currentBid: auction.currentBid,
-        bids: auction.bids
-      }
+        currentBid: updatedAuction.currentBid,
+        bids: updatedAuction.bids,
+      },
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
